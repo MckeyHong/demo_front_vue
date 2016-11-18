@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Lumen & Vue - 客戶資料 Demo</title>
+        <link rel="stylesheet" href="style.css" />
+        <link rel="stylesheet" href="fonts/iconfont.css" />
+    </head>
+    <body>
+        <div id="app">
+            <div class="container">
+                <div class="form-group">
+                    <button @click="this.show = true">新增</button>
+                </div>
+            </div>
+            <div class="container">
+                <simple-grid :data-list="gridData" :columns="gridColumns" 
+                    v-on:load-entry="loadCustomer" 
+                    v-on:delete-entry="deleteCustomer">
+                </simple-grid>
+            </div>
+            <modal-dialog v-bind:show.sync="show">
+                <header class="dialog-header" slot="header">
+                    <h1 class="dialog-title">{{ item.id ? '編輯客戶 - ' + item.name : '新增客戶' }}</h1>
+                </header>
+                <div class="dialog-body" slot="body">
+                    <div v-show="item.id" class="form-group">
+                        <label>編號</label>
+                        {{item.id}}
+                    </div>
+                    <div class="form-group">
+                        <label>帳號</label>
+                        <input type="text" v-model="item.username" placeholder="4-20個英文數字組合" maxlength="20" />
+                    </div>
+                    <div class="form-group">
+                        <label>密碼</label>
+                        <input type="password" v-model="item.password" placeholder="4-20個英文數字組合" maxlength="20" />
+                    </div>
+                    <div class="form-group">
+                        <label>名稱</label>
+                        <input type="text" v-model="item.name" maxlength="30" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="text" v-model="item.email" maxlength="64" />
+                    </div>
+                    <div class="form-group">
+                        <label>電話</label>
+                        <input type="text" v-model="item.phone" maxlength="20" />
+                    </div>
+                    <div class="form-group">
+                        <label>國籍</label>
+                        <input type="text" v-model="item.country" maxlength="30" />
+                    </div>                  
+                    <div class="form-group">
+                        <label></label>
+                        <button @click="saveCustomer">儲存</button>
+                    </div>
+                </div>
+            </modal-dialog>
+        </div>
+
+        <template id="grid-template">
+            <table>
+                <thead>
+                    <tr>
+                        <th v-for="col in columns" align="center">
+                            {{ col.title | capitalize}}
+                        </th>
+                        <th>刪除</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(index,entry) in dataList">
+                        <td v-for="col in columns" align="center">
+                            <span v-if="col.isKey"><a href="javascript:void(0)" @click="loadEntry(entry[col.name])">{{ entry[col.name] }}</a></span>
+                            <span v-else>{{ entry[col.name] }}</span>
+                        </td>
+                        <td align="center">
+                            <button class="btn-danger" @click="deleteEntry(entry)">刪除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </template>
+        <template id="dialog-template">
+            <div class="dialogs">
+                <div class="dialog" v-bind:class="{ 'dialog-active': show }">
+                    <div class="dialog-content">
+                        <div class="close rotate">
+                            <span class="iconfont icon-close" @click="close"></span>
+                        </div>
+                        <slot name="header"></slot>
+                        <slot name="body"></slot>
+                        <slot name="footer"></slot>
+                    </div>
+                </div>
+                <div class="dialog-overlay"></div>
+            </div>
+        </template>
+
+        <script src="js/vue.js"></script>
+        <script src="js/vue-resource.js"></script>
+        <script>
+            Vue.component('simple-grid', {
+                template: '#grid-template',
+                props: ['dataList', 'columns'],
+                methods: {
+                    loadEntry: function (key) {
+                        this.$dispatch('load-entry', key);
+                    },
+                    deleteEntry: function (entry) {
+                        this.$dispatch('delete-entry', entry);
+                    }
+                }
+            })
+
+            Vue.component('modal-dialog', {
+                template: '#dialog-template',
+                props: ['show'],
+                methods: {
+                    close: function () {
+                        this.show = false;
+                    }
+                }
+            })
+        </script>
+        <script>
+            var demo = new Vue({
+                el: '#app',
+                data: {
+                    show: false,
+                    title: '',
+                    gridColumns: [{
+                        name: 'id',
+                        title: '編號',
+                        isKey: true
+                    }, {
+                        name: 'username',
+                        title: '帳號',
+                    }, {
+                        name: 'name',
+                        title: '名稱',
+                    }, {
+                        name: 'email',
+                        title: 'Email',
+                    }, {
+                        name: 'phone',
+                        title: '電話',
+                    }, {
+                        name: 'country',
+                        title: '國籍',
+                    }],
+                    gridData: [],
+                    apiUrl: 'http://localhost:8888/demo_back_lumen/public/customer',
+                    item: {}
+                },
+                ready: function () {
+                    this.getCustomers()
+                },
+                methods: {
+                    // 關閉新增&修改介面
+                    closeDialog: function () {
+                        this.show = false
+                    },
+                    // 取得客戶詳細資料
+                    loadCustomer: function(id) {
+                        var vm = this
+                        vm.gridData.forEach(function(item) {
+                            if (item.id === id) {
+                                vm.$set('item', item);
+                                vm.$set('show', true);
+                                return
+                            }
+                        })
+                    },
+                    // 判斷 新增/修改
+                    saveCustomer: function () {
+                        this.item.id ? this.updateCustomer() : this.createCustomer();
+                    },
+                    // 取得客戶資料
+                    getCustomers: function () {
+                        var vm = this
+                        vm.$http.get(vm.apiUrl)
+                            .then((response) => {
+                                vm.$set('gridData', response.data.result);
+                            })
+                    },
+                    // 新增客戶資料
+                    createCustomer: function () {
+                        var vm = this
+                        vm.$http.post(vm.apiUrl, vm.item)
+                            .then((response) => {
+                                vm.$set('item', {});
+                                vm.getCustomers();
+                                this.show = false;
+                            })
+                            .catch((response) => {
+                                alert("新增資料有誤");
+                                this.show = true;
+                            });
+                    },
+                    // 修改客戶資料
+                    updateCustomer: function () {
+                        var vm = this
+                        vm.$http.put(this.apiUrl + '/' + vm.item.id, vm.item)
+                            .then((response) => {
+                                vm.getCustomers();
+                                this.show = false;
+                            })
+                            .catch((response) => {
+                                alert("修改資料有誤");
+                                this.show = true;
+                            });                            
+                    },
+                    // 刪除客戶資料
+                    deleteCustomer: function (customer) {
+                        if (confirm("確定要刪除此筆客戶資料?? \n 帳號：" + customer.username + "\n 名稱：" + customer.name)) {
+                            var vm = this
+                            vm.$http.delete(this.apiUrl + '/' + customer.id)
+                                .then((response) => {
+                                    vm.getCustomers();
+                                    this.show = false;
+                                })
+                                .catch((response) => {
+                                    alert("刪除資料有誤");
+                                    this.show = true;
+                                }); 
+                        }
+                    }
+                }
+            })
+            demo.$watch('show', function (newVal, oldVal) {
+                if (!newVal) {
+                    this.item = {};
+                }
+            })
+        </script>
+    </body>
+</html>
